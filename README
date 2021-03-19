@@ -1,0 +1,13 @@
+This project has two components
+
+A sensor/Tx side consisting of a solar panel, LiPO battery & a Adafruit Feather M0 RFM95 LoRa
+with a MPU650 accelorometer. 
+
+A receiver side simply consisting of a Adafruit Feather M0 RFM95 & a buzzer
+
+Operation:
+
+Detector is put in an area if high squirell activity. Once its stepped on it sends a signal
+to the receiver which then produces a high pitched beep
+
+Uses the excellent RFM95 driver from RadioHead - https://www.airspayce.com/mikem/arduino/RadioHead/
