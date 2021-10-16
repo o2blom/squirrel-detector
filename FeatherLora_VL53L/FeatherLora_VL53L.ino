@@ -12,8 +12,6 @@
 
 const int MPU=0x68; 
 
-#define PKT_SIZE 64
-
 // Blinky on Tx 
 #define LED 13
  
@@ -22,6 +20,9 @@ const int MPU=0x68;
 #define RFM95_RST 4
 #define RFM95_INT 3
 
+#define BATT_SENSOR_PIN A9
+
+int sensorPin = A0;   
 
 // Change to 434.0 or other frequency, must match RX's freq!
 #define RF95_FREQ 915.0
@@ -35,7 +36,23 @@ SFEVL53L1X distanceSensor;
 #define HISTORY_SIZE 10
 int history[HISTORY_SIZE];
 byte historySpot;
- 
+
+enum {
+  EVENT_MOTION = 1 << 0,
+  EVENT_MOTION_2 = 1 << 1,
+} event_e;
+
+typedef struct 
+{
+    uint32_t dst;
+    uint8_t ver;
+    uint8_t src;
+    uint16_t voltage;
+    uint32_t event;
+} pkt_t;
+
+pkt_t pkt;
+
 void setup() 
 {
   Wire.begin();
@@ -90,6 +107,11 @@ void setup()
 
   for (int x = 0; x < HISTORY_SIZE; x++)
     history[x] = 0;
+
+  //Fill in static items 
+  pkt.dst = 0xFEEDBABE;
+  pkt.ver = 1;
+  pkt.src = 2;
 }
  
 int16_t packetnum = 0;  // packet counter, we increment per xmission
@@ -100,7 +122,6 @@ void loop()
   static unsigned int statusOld = 0;
   int statusChange = 0;
   int led_enable = 0;
-  char radiopacket[PKT_SIZE];
   static unsigned int  pktNum = 0, loopcnt = 0;
   loopcnt++;
 
@@ -204,18 +225,28 @@ void loop()
   Serial.println("Transmitting..."); // Send a message to rf95_server
   pktNum++;
 
-  sprintf(radiopacket, "SQUIRLY X: %d Y: %d Z: %d PKT: %d", distance, percentDiff, rangeStatus, pktNum); 
-  Serial.print("Sending "); Serial.println(radiopacket);
-  radiopacket[PKT_SIZE - 1] = 0;
-  
+  pkt.event = EVENT_MOTION;
+  pkt.voltage = analogRead(BATT_SENSOR_PIN) * ((4.35 * 1000)/1024.0);  //1024 = 6.6V
+
+  Serial.print("Battery Voltage: "); Serial.println(pkt.voltage);
+
   Serial.println("Sending...");
   delay(10);
-  rf95.send((uint8_t *)radiopacket, strlen(radiopacket));
+  rf95.send((uint8_t *)&pkt, sizeof(pkt_t));
  
   Serial.println("Waiting for packet to complete..."); 
   delay(100); //used to be 10
-// rf95.waitPacketSent();
+// rf95.waitPacketSent();  //D
   Serial.println("Complete !"); 
 
   digitalWrite(LED, LOW);
+}
+
+int GetBattVoltage()
+{
+  float measuredvbat = analogRead(BATT_SENSOR_PIN);
+  measuredvbat *= 2;    // we divided by 2, so multiply back
+  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+  measuredvbat /= 1024; // convert to voltage
+  return (measuredvbat * 1000);
 }

@@ -27,12 +27,29 @@ int xAve, yAve, zAve;
 #define RFM95_RST 4
 #define RFM95_INT 3
 
+#define BATT_SENSOR_PIN A7
 
 // Change to 434.0 or other frequency, must match RX's freq!
 #define RF95_FREQ 915.0
  
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
+
+enum {
+  EVENT_MOTION = 1 << 0,
+  EVENT_VIBRATION = 1 << 1,
+} event_e;
+
+typedef struct 
+{
+    uint32_t dst;
+    uint8_t ver;
+    uint8_t src;
+    uint16_t voltage;
+    uint32_t event;
+} pkt_t;
+
+pkt_t pkt;
  
 void setup() 
 {
@@ -82,6 +99,11 @@ void setup()
   Wire.write(0x6B); 
   Wire.write(0);    
   Wire.endTransmission(true);
+
+  //Fill in static items 
+  pkt.dst = 0xFEEDBABE;
+  pkt.ver = 1;
+  pkt.src = 3;
 }
  
 int16_t packetnum = 0;  // packet counter, we increment per xmission
@@ -126,14 +148,15 @@ void loop()
   Serial.println("Transmitting..."); // Send a message to rf95_server
   pktNum++;
 
-  sprintf(radiopacket, "SQUIRLY X: %d Y: %d Z: %d PKT: %d", xdiff, ydiff, zdiff, pktNum); 
-  Serial.print("Sending "); Serial.println(radiopacket);
-  radiopacket[PKT_SIZE - 1] = 0;
-  
+  pkt.event = EVENT_VIBRATION;
+  pkt.voltage = analogRead(BATT_SENSOR_PIN) * ((6.6 * 1000)/1024.0);  //1024 = 6.6V
+
+  Serial.print("Battery Voltage: "); Serial.println(pkt.voltage);
+
   Serial.println("Sending...");
   delay(10);
-  rf95.send((uint8_t *)radiopacket, strlen(radiopacket));
- 
+  rf95.send((uint8_t *)&pkt, sizeof(pkt_t)); 
+  
   Serial.println("Waiting for packet to complete..."); 
   delay(100); //used to be 10
   rf95.waitPacketSent();

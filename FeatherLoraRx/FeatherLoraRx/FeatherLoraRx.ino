@@ -11,6 +11,23 @@
 #include "pitches.h"
 
 
+enum {
+  EVENT_MOTION = 1 << 0,
+  EVENT_MOTION_2 = 1 << 1,
+} event_e;
+
+typedef struct 
+{
+    uint32_t dst;
+    uint8_t ver;
+    uint8_t src;
+    uint16_t voltage;
+    uint32_t event;
+} pkt_t;
+
+pkt_t pkt;
+
+
 //#define ENABLE_SERIAL_PORT  //Need to disable this for stand-alone use 
 
 
@@ -38,14 +55,15 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 // Blinky on receipt
 #define LED 13
 
-#define BUZZER 16
+#define BUZZER 14  //For M0 Rx 
+//#define BUZZER 16
 
 void setup()
 {
   pinMode(LED, OUTPUT);
   pinMode(RFM95_RST, OUTPUT);
   pinMode(BUZZER, OUTPUT);
-  digitalWrite(BUZZER, HIGH);
+  digitalWrite(BUZZER, LOW);
   digitalWrite(RFM95_RST, HIGH);
 
   Serial.begin(115200);
@@ -87,14 +105,13 @@ void setup()
   // you can set transmitter powers from 5 to 23 dBm:
   rf95.setTxPower(23, false);
 
-  digitalWrite(BUZZER, HIGH);
+  digitalWrite(BUZZER, LOW);
   digitalWrite(LED , LOW);
 }
 
 void loop()
 {
   int gotPkt = 0;
-  char magic[] = "SQUIRLY";
   if (rf95.available())
   {
     // Should be a message for us now
@@ -103,31 +120,41 @@ void loop()
 
     if (rf95.recv(buf, &len))
     {
-      RH_RF95::printBuffer("Received: ", buf, len);
+      memcpy(&pkt, &buf, sizeof(pkt));
       Serial.print("Got Pkt Len: ");
-      Serial.print(len);
-      Serial.print(" Data: ");
-      Serial.println((char*)buf);
+      Serial.println(len);
+
       Serial.print("RSSI: ");
       Serial.println(rf95.lastRssi(), DEC);
-      if (strstr((const char*) buf,  magic))  //Make sure its for us
+
+      if ((len == sizeof(pkt)) && (pkt.dst = 0xFEEDBABE))
       {
-        gotPkt = 1;
-      }
+          Serial.print("Got Packet From Unit: ");
+          Serial.println(pkt.src);
+          Serial.print("Voltage: ");
+          Serial.println(pkt.voltage);
+          Serial.print("Event: ");
+          Serial.println(pkt.event, HEX);
+          gotPkt = 1;
+       }
+       else 
+       {
+          Serial.println("Packet not for us");
+       }
     }
     else
     {
-      Serial.println("Receive failed");
+      Serial.println("Rx Failed");
     }
     if (gotPkt)
     {
       digitalWrite(LED, HIGH);
-      digitalWrite(BUZZER, LOW);
+      digitalWrite(BUZZER, HIGH);
 //      PlayTones();  //Cant call any functions here w/o crashing 
 //      PlayMusic();
       delay(500);
       digitalWrite(LED, LOW);
-      digitalWrite(BUZZER, HIGH);
+      digitalWrite(BUZZER, LOW);
     }
   }
 }
