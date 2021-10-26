@@ -12,6 +12,8 @@
 
 const int MPU=0x68; 
 
+#define DEVICE_ID 1
+
 // Blinky on Tx 
 #define LED 13
  
@@ -111,7 +113,7 @@ void setup()
   //Fill in static items 
   pkt.dst = 0xFEEDBABE;
   pkt.ver = 1;
-  pkt.src = 2;
+  pkt.src = DEVICE_ID;
 }
  
 int16_t packetnum = 0;  // packet counter, we increment per xmission
@@ -120,6 +122,7 @@ void loop()
 {
   static unsigned int statusBits = 0;
   static unsigned int statusOld = 0;
+  static int initCnt = HISTORY_SIZE;
   int statusChange = 0;
   int led_enable = 0;
   static unsigned int  pktNum = 0, loopcnt = 0;
@@ -137,8 +140,8 @@ void loop()
   if (distance == 0)
     return;
 
-  Serial.print("Distance(mm): ");
-  Serial.print(distance);
+//  Serial.print("Distance(mm): ");
+//  Serial.print(distance);
 
   //Add new sample to rotating buffer
   history[historySpot] = distance;
@@ -153,27 +156,45 @@ void loop()
   //And divide to find the running average 
   avgDistance /= HISTORY_SIZE;
 
+  if (initCnt)
+  {
+    initCnt--; //To avoid trigger when first powered on 
+    return;
+  }
+
   byte rangeStatus = distanceSensor.getRangeStatus();
+#ifdef DEBUG
   Serial.print("\tRange Status: ");
+#endif
 
   //Make it human readable
   switch (rangeStatus)
   {
   case 0:
+#ifdef DEBUG  
     Serial.print("Good");
+#endif    
     break;
   case 1:
+#ifdef DEBUG  
     Serial.print("Sigma fail");
+#endif    
     break;
   case 2:
+#ifdef DEBUG  
     Serial.print("Signal fail");
+#endif
     break;
   case 7:
+#ifdef DEBUG  
     Serial.print("Wrapped target fail");
+#endif    
     break;
   default:
+#ifdef DEBUG  
     Serial.print("Unknown: ");
     Serial.print(rangeStatus);
+#endif    
     break;
   }
 
@@ -198,11 +219,11 @@ void loop()
   
 //  statusBits = (statusBits << 1) | (!!rangeStatus);  //16 samples
 
+#ifdef DEBUG
   Serial.print("\tStatusBits: ");
   Serial.print(statusBits);
-  
-
   Serial.println();
+#endif  
 
   //(abs(distance - avgDistance) > 100)
   float percentDiff = (100 * ((float)distance / (float) avgDistance));
@@ -214,6 +235,25 @@ void loop()
   {
     led_enable = 500;
     Serial.print("Motion Detection\n");
+    Serial.print("Distance: ");
+    Serial.print(distance);
+    Serial.print(" AveDistance: ");
+    Serial.println(avgDistance);
+    Serial.print("Percent Diff: ");
+    Serial.println(percentDiff);
+    Serial.print("History Spot: ");
+    Serial.println(historySpot);
+
+    for (int i = 0; i < HISTORY_SIZE; i++)
+    {
+      Serial.print(" ");
+      Serial.print(history[i]);
+    }
+
+    Serial.print("\nStatusBits: ");
+    Serial.println(statusBits, HEX);  
+    Serial.print("StatusOld: ");
+    Serial.println(statusOld, HEX);  
   }
   else return;
   
@@ -236,7 +276,7 @@ void loop()
  
   Serial.println("Waiting for packet to complete..."); 
   delay(100); //used to be 10
-// rf95.waitPacketSent();  //D
+ // rf95.waitPacketSent();  //This locks up
   Serial.println("Complete !"); 
 
   digitalWrite(LED, LOW);

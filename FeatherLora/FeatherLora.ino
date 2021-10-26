@@ -124,19 +124,19 @@ void loop()
 
   if (abs(x - xAve) > ACC_THRESHOLD)
   {
-     Serial.print("XEvent: "); Serial.print(x);  Serial.print("Ave: ");  Serial.println(xAve); 
+     Serial.print("XEvent: "); Serial.print(x);  Serial.print(" Ave: ");  Serial.println(xAve); 
      xdiff = abs(x - xAve);
   }
 
   if (abs(y - yAve) > ACC_THRESHOLD)
   {
-     Serial.print("YEvent: "); Serial.print(y);  Serial.print("Ave: ");  Serial.println(yAve); 
+     Serial.print("YEvent: "); Serial.print(y);  Serial.print(" Ave: ");  Serial.println(yAve); 
      ydiff = abs(y - yAve);
   }
 
   if (abs(z - zAve) > ACC_THRESHOLD)
   {
-     Serial.print("ZEvent: "); Serial.print(z);  Serial.print("Ave: ");  Serial.println(zAve); 
+     Serial.print("ZEvent: "); Serial.print(z);  Serial.print(" Ave: ");  Serial.println(zAve); 
      zdiff = abs(z - zAve);
   }
 
