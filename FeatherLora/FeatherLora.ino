@@ -28,7 +28,7 @@
 
 #define RF95_FREQ 915.0
 
-#define DEVICE_ID 2
+#define DEVICE_ID 1
 
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
@@ -48,15 +48,11 @@ typedef struct
 } pkt_t;
 
 #ifdef DEBUG
-#define dbg(x) Serial.print(str)
-#define dbg(x,f) Serial.print(str,f)
-#define dbgln(x) Serial.println(str)
-#define dbgln(x,f) Serial.println(str,f)
+#define dbg(...) Serial.print(__VA_ARGS__)
+#define dbgln(...) Serial.println(__VA_ARGS__)
 #else
-#define dbg(x) 
-#define dbg(x,f) 
-#define dbgln(x) 
-#define dbgln(x,f) 
+#define dbg(...) 
+#define dbgln(...) 
 #endif
 
 pkt_t pkt;
@@ -97,6 +93,9 @@ void setup()
 
   setupSensor();
 
+  dbgln("Testing!");
+  Serial.println(RF95_FREQ);
+
   //Fill in static items 
   pkt.dst = 0xFEEDBABE;
   pkt.ver = 1;
@@ -128,7 +127,7 @@ void loop()
   
   Serial.println("Waiting for packet to complete..."); 
   delay(100); //used to be 10
-  rf95.waitPacketSent(); //This does not work for some reason
+//  rf95.waitPacketSent(); //This does not work for some reason
   Serial.println("Complete !"); 
 
   digitalWrite(LED, LOW);
@@ -286,7 +285,7 @@ int sensorProcessing()
   distanceSensor.stopRanging();
   
   if (distance == 0) //Some form of error
-    return;
+    return 0;
 
   //Add new sample to rotating buffer
   history[historySpot] = distance;
@@ -304,42 +303,30 @@ int sensorProcessing()
   if (initCnt)
   {
     initCnt--; //To avoid trigger when first powered on 
-    return;
+    return 0;
   }
 
   byte rangeStatus = distanceSensor.getRangeStatus();
-#ifdef DEBUG
-  Serial.print("\tRange Status: ");
-#endif
+  dbg("Range Status: ");
 
   //Make it human readable
   switch (rangeStatus)
   {
   case 0:
-#ifdef DEBUG  
-    Serial.print("Good");
-#endif    
+    dbgln("Good");
     break;
   case 1:
-#ifdef DEBUG  
-    Serial.print("Sigma fail");
-#endif    
+    dbgln("Sigma fail");
     break;
   case 2:
-#ifdef DEBUG  
-    Serial.print("Signal fail");
-#endif
+    dbgln("Signal fail");
     break;
   case 7:
-#ifdef DEBUG  
-    Serial.print("Wrapped target fail");
-#endif    
+    dbgln("Wrapped target fail");
     break;
   default:
-#ifdef DEBUG  
-    Serial.print("Unknown: ");
-    Serial.print(rangeStatus);
-#endif    
+    dbg("Unknown: ");
+    dbgln(rangeStatus);
     break;
   }
 
@@ -353,22 +340,18 @@ int sensorProcessing()
   {
     statusOld = 0;
     statusChange = 1;
-    Serial.print("Status Switching to OK");
+    dbg("Status Switching to OK");
   }
   else if ((statusBits > 7) && (statusOld == 0))
   {
     statusOld = 1;
     statusChange = 1;
-    Serial.print("Status Switching to Error");
+    dbg("Status Switching to Error");
   }
   
-//  statusBits = (statusBits << 1) | (!!rangeStatus);  //16 samples
-
-#ifdef DEBUG
-  Serial.print("\tStatusBits: ");
-  Serial.print(statusBits);
-  Serial.println();
-#endif  
+  dbg("StatusBits: ");
+  dbg(statusBits);
+  dbgln();
 
   float percentDiff = (100 * ((float)distance / (float) avgDistance));
   
