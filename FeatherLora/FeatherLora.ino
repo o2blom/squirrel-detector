@@ -30,6 +30,8 @@
 
 #define DEVICE_ID 1
 
+#define EEPROM_ADDRESS_FOR_OFFSET (E2END - 2) // last 2 bytes of EEPROM
+
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
@@ -99,7 +101,8 @@ void setup()
   //Fill in static items 
   pkt.dst = 0xFEEDBABE;
   pkt.ver = 1;
-  pkt.src = DEVICE_ID;
+  pkt.src = DEVICE_ID; //eeprom_read_word((uint16_t *)EEPROM_ADDRESS_FOR_OFFSET)
+  eeprom_read_word((uint16_t *)EEPROM_ADDRESS_FOR_OFFSET);
 }
  
 void loop()
