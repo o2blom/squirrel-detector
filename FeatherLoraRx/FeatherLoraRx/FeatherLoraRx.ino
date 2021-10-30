@@ -202,16 +202,15 @@ void loop()
             logs[pkt.src].timestamp = millis();
             logs[pkt.src].rssi = rf95.lastRssi();
             logs[pkt.src].voltage = pkt.voltage;
-            if ((logs[pkt.src].timestamp - logs[pkt.src].events[0].timestamp) > 5000)  //Only record new event if its more than 5 sec old
+            if (((logs[pkt.src].timestamp - logs[pkt.src].events[0].timestamp) > 5000) && (pkt.event))  //Only record new event if its more than 5 sec old (Dont record keepalives)
             {
+              gotPkt = 1;
               logs[pkt.src].events[1].timestamp = logs[pkt.src].events[0].timestamp; 
               logs[pkt.src].events[1].event = logs[pkt.src].events[0].event;
               logs[pkt.src].events[0].timestamp = millis();
               logs[pkt.src].events[0].event = pkt.event;
             }
           }
-                    
-          gotPkt = 1;
        }
        else 
        {
@@ -293,8 +292,10 @@ void drawBattery(int x, int y, int mV)
   display.drawRect(x + BATT_W, y + (BATT_H / 2) - 2 , 2, 4, SSD1306_WHITE);
 
   //Figure out conversion from Voltage to pixels 
-  if (mV < 3200)
+  if (mV < 3200) //Clamp values between 3.2 & 4.2V
     mV = 3200;
+  else if (mV > 4200.0) 
+    mV = 4200;
   
   display.fillRect(x, y, BATT_W * ((mV - 3200.0) / (4200.0 - 3200.0)), BATT_H, SSD1306_WHITE);
 }
@@ -314,23 +315,23 @@ void drawRSSI(int x, int y, int db)
 
     if (rfMargin < 0)  
       return;        
-    else if (rfMargin < 10) {
+    else if (rfMargin < 5) {
         xt = 4;
         yt = 2;
     }
-    else if (rfMargin < 20) { 
+    else if (rfMargin < 10) { 
         xt = 6;
         yt = 3;
     }
-    else if (rfMargin < 30) { 
+    else if (rfMargin < 15) { 
         xt = 8;
         yt = 4;
     }
-    else if (rfMargin < 40) {
+    else if (rfMargin < 20) {
         xt = 10;
         yt = 5;      
     }
-    else if (rfMargin < 60) {
+    else if (rfMargin < 30) {
         xt = 12;
         yt = 6;      
     }

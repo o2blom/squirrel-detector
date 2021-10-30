@@ -1,7 +1,8 @@
 
 //Enable sensor here 
-//#define CONFIG_MPU6050
-#define CONFIG_VL53L1X
+#define CONFIG_MPU6050
+//#define CONFIG_VL53L1X
+#define DEVICE_ID 3
 
 //#define DEBUG
 
@@ -28,9 +29,10 @@
 
 #define RF95_FREQ 915.0
 
-#define DEVICE_ID 1
 
+#ifdef __AVR_ATmega32U4__
 #define EEPROM_ADDRESS_FOR_OFFSET (E2END - 2) // last 2 bytes of EEPROM
+#endif
 
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
@@ -58,6 +60,7 @@ typedef struct
 #endif
 
 pkt_t pkt;
+unsigned long next_callin; 
  
 void setup() 
 {
@@ -76,6 +79,9 @@ void setup()
   delay(10);
   digitalWrite(RFM95_RST, HIGH);
   delay(10);
+  
+  randomSeed(analogRead(0));  //This is used to randomize the call-in periods 
+  next_callin = millis() + random(50000, 80000);
  
   while (!rf95.init()) {
     Serial.println("LoRa radio init failed");
@@ -102,7 +108,9 @@ void setup()
   pkt.dst = 0xFEEDBABE;
   pkt.ver = 1;
   pkt.src = DEVICE_ID; //eeprom_read_word((uint16_t *)EEPROM_ADDRESS_FOR_OFFSET)
+#ifdef __AVR_ATmega32U4__ 
   eeprom_read_word((uint16_t *)EEPROM_ADDRESS_FOR_OFFSET);
+#endif   
 }
  
 void loop()
@@ -111,19 +119,32 @@ void loop()
   int ev;
 
   ev = sensorProcessing();
-  
+ 
   if (ev == 0)
-    return;
+  {
+    if (millis() > next_callin)  //Time for call-in ?
+      next_callin = millis() + random(50000, 80000);
+    else
+      return;
+  }
 
   //if we get here there is activity 
-  digitalWrite(LED, HIGH);
+  if (ev)
+    digitalWrite(LED, HIGH);
     
   pktNum++;
 
   pkt.event = ev;
+#ifdef __AVR_ATmega32U4__  
+  pkt.voltage = analogRead(BATT_SENSOR_PIN) * ((4.35 * 1000)/1024.0);  //1024 = 6.6V //Lora32U4 MK2 does not have the same resistor divider :(
+#else
   pkt.voltage = analogRead(BATT_SENSOR_PIN) * ((6.6 * 1000)/1024.0);  //1024 = 6.6V
+#endif
 
-  Serial.println("Activity Detected - Sending pkt");
+  if (ev) 
+    Serial.println("Activity Detected - Sending pkt");
+  else 
+    Serial.println("Sending Call-in");
   Serial.print("Battery Voltage: "); Serial.println(pkt.voltage);
 
   rf95.send((uint8_t *)&pkt, sizeof(pkt_t)); 
@@ -133,7 +154,8 @@ void loop()
 //  rf95.waitPacketSent(); //This does not work for some reason
   Serial.println("Complete !"); 
 
-  digitalWrite(LED, LOW);
+  if (ev)
+    digitalWrite(LED, LOW);
 }
 
 //**********************************************
@@ -169,7 +191,7 @@ int sensorProcessing() //Returns 1 if activity is detected
   UpdateRunningAverage();
 
   if (loopcnt < FILTER_DEPTH) 
-    return; 
+    return 0; 
 
   if (abs(x - xAve) > ACC_THRESHOLD)
   {
@@ -190,7 +212,7 @@ int sensorProcessing() //Returns 1 if activity is detected
   }
 
   if ((xdiff || ydiff || zdiff) == 0)
-    return;
+    return 0;
 
   return EVENT_VIBRATION;
 }
