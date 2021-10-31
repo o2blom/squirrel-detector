@@ -1,8 +1,8 @@
 
 //Enable sensor here 
-#define CONFIG_MPU6050
-//#define CONFIG_VL53L1X
-#define DEVICE_ID 3
+//#define CONFIG_MPU6050
+#define CONFIG_VL53L1X
+#define DEVICE_ID 0
 
 //#define DEBUG
 
@@ -98,6 +98,7 @@ void setup()
   Serial.print("Set Freq to: "); Serial.println(RF95_FREQ);
 
   rf95.setTxPower(23, false); //Full Power
+//  rf95.setModemConfig(RH_RF95::Bw125Cr45Sf2048);
 
   setupSensor();
 

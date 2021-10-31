@@ -39,6 +39,8 @@ typedef struct
 
 #define MAX_EVENT_LOG 2
 #define MAX_DEVICES 4
+#define COMM_TIMEOUT 120000 //Time out if we have not heard anything in 2 minutes
+
 typedef struct 
 {
     uint16_t voltage;
@@ -46,6 +48,21 @@ typedef struct
     uint32_t timestamp; //This records the time of the last incoming message (used to keep track of units going offline) 
     event_t events[MAX_EVENT_LOG];
 } log_t;
+
+
+typedef struct 
+{
+  int x;
+  int y;
+} point_t;
+
+typedef struct 
+{
+  point_t rssi;
+  point_t batt;
+} ui_loc_t;
+
+ui_loc_t ui_xy[MAX_DEVICES];
 
 log_t logs[MAX_DEVICES];
 
@@ -165,9 +182,11 @@ void setup()
   // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then
   // you can set transmitter powers from 5 to 23 dBm:
   rf95.setTxPower(23, false);
+//  rf95.setModemConfig(RH_RF95::Bw125Cr45Sf2048);
 
   digitalWrite(BUZZER, LOW);
   digitalWrite(LED , LOW);
+  setupUI();
 }
 
 void loop()
@@ -262,18 +281,20 @@ int PlayMusic()  //This causes some form of stack corruption
 
 void drawUI()
 {
+  unsigned long t = millis();
   display.clearDisplay();
 
   drawFrame();
-  drawBattery(N1_X + 43, N1_Y + 0, logs[0].voltage);
-  drawBattery(N2_X + 43, N2_Y + 0, logs[1].voltage);
-  drawBattery(N3_X + 43, N3_Y + 0, logs[2].voltage);
-  drawBattery(N4_X + 43, N4_Y + 0, logs[3].voltage);
 
-  drawRSSI(N1_X + 23, N1_Y + 0, logs[0].rssi); 
-  drawRSSI(N2_X + 23, N2_Y + 0, logs[1].rssi); 
-  drawRSSI(N3_X + 23, N3_Y + 0, logs[2].rssi); 
-  drawRSSI(N4_X + 23, N4_Y + 0, logs[3].rssi); 
+  for (int i = 0; i < MAX_DEVICES; i++)
+  {
+    if ((t - logs[i].timestamp < COMM_TIMEOUT) && logs[i].timestamp)
+    {
+      drawBattery(ui_xy[i].batt.x, ui_xy[i].batt.y, logs[i].voltage);
+      drawRSSI(ui_xy[i].rssi.x, ui_xy[i].rssi.y, logs[i].rssi); 
+    }
+    else drawX(ui_xy[i].rssi.x, ui_xy[i].rssi.y);
+  }
   
   drawText();    
 
@@ -345,6 +366,13 @@ void drawRSSI(int x, int y, int db)
       x, y + RSSI_HEIGHT, //Lower left corner, always same
       x + xt, y + RSSI_HEIGHT - yt, //Upper right corner. X & Y Varies 
       x + xt, y + RSSI_HEIGHT, SSD1306_WHITE); //Lower right corner, X varies 
+}
+
+//Draws an X in the same size as signal bar
+void drawX(int x, int y) 
+{
+  display.drawLine(x, y, x+14, y+7, SSD1306_WHITE);    
+  display.drawLine(x, y+7, x+14, y, SSD1306_WHITE);    
 }
 
 void drawText(void) {
@@ -430,4 +458,31 @@ char *convTime(unsigned long t)
 
   sprintf(str, "%02d:%02d:%02d", hours, minutes, seconds);
   return str;
+}
+
+void setupUI()
+{
+  ui_xy[0].batt.x = N1_X + 43;
+  ui_xy[0].batt.y = N1_Y + 0;
+
+  ui_xy[1].batt.x = N2_X + 43;
+  ui_xy[1].batt.y = N2_Y + 0;
+
+  ui_xy[2].batt.x = N3_X + 43;
+  ui_xy[2].batt.y = N3_Y + 0;
+
+  ui_xy[3].batt.x = N4_X + 43;
+  ui_xy[3].batt.y = N4_Y + 0;
+
+  ui_xy[0].rssi.x = N1_X + 23;
+  ui_xy[0].rssi.y = N1_Y + 0;
+
+  ui_xy[1].rssi.x = N2_X + 23;
+  ui_xy[1].rssi.y = N2_Y + 0;
+
+  ui_xy[2].rssi.x = N3_X + 23;
+  ui_xy[2].rssi.y = N3_Y + 0;
+
+  ui_xy[3].rssi.x = N4_X + 23;
+  ui_xy[3].rssi.y = N4_Y + 0;
 }
