@@ -8,7 +8,6 @@
 
 #include <SPI.h>
 #include <RH_RF95.h>
-#include "pitches.h"
 
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -20,7 +19,7 @@ enum {
   EVENT_MOTION_2 = 1 << 1,
 } event_e;
 
-typedef struct 
+typedef struct  //12 bytes
 {
     uint32_t dst;
     uint8_t ver;
@@ -36,6 +35,8 @@ typedef struct
     uint32_t timestamp;
     uint32_t event;
 } event_t;
+
+#define PASSIVE_BUZZER
 
 #define MAX_EVENT_LOG 2
 #define MAX_DEVICES 4
@@ -69,17 +70,8 @@ log_t logs[MAX_DEVICES];
 //#define ENABLE_SERIAL_PORT  //Need to disable this for stand-alone use 
 
 
-// notes in the melody:
-const int melody[] = {
-  NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4
-};
 
-// note durations: 4 = quarter note, 8 = eighth note, etc.:
-const int noteDurations[] = {
-  4, 8, 8, 4, 4, 4, 4, 4
-};
-
-// for feather m0 RFM9x
+// for feather m0 RFM9x  --- NOTE !!!! This code only works for M0 (or bigger MCUs) !!! u32u4 is too small 
 #define RFM95_CS 8
 #define RFM95_RST 4
 #define RFM95_INT 3
@@ -94,7 +86,7 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 #define LED 13
 
 #define BUZZER 14  //For M0 Rx 
-//#define BUZZER 16
+
 
 //***********************************************************
 //                  OLED Display Defines 
@@ -201,20 +193,19 @@ void loop()
     if (rf95.recv(buf, &len))
     {
       memcpy(&pkt, &buf, sizeof(pkt));
-      Serial.print("Got Pkt Len: ");
-      Serial.println(len);
-
-      Serial.print("RSSI: ");
-      Serial.println(rf95.lastRssi(), DEC);
+//      Serial.print("Got Pkt Len: ");
+//      Serial.println(len);
 
       if ((len == sizeof(pkt)) && (pkt.dst = 0xFEEDBABE))
       {
           Serial.print("Got Packet From Unit: ");
-          Serial.println(pkt.src);
-          Serial.print("Voltage: ");
-          Serial.println(pkt.voltage);
-          Serial.print("Event: ");
-          Serial.println(pkt.event, HEX);
+          Serial.print(pkt.src);
+          Serial.print(" Voltage: ");
+          Serial.print(pkt.voltage);
+          Serial.print(" Event: ");
+          Serial.print(pkt.event, HEX);
+          Serial.print(" RSSI: ");
+          Serial.println(rf95.lastRssi(), DEC);
 
           if (pkt.src < MAX_DEVICES)
           {
@@ -244,9 +235,16 @@ void loop()
     {
       digitalWrite(LED, HIGH);
       digitalWrite(BUZZER, HIGH);
-//      PlayTones();  //Cant call any functions here w/o crashing 
-//      PlayMusic();
+#ifdef PASSIVE_BUZZER      
+      for (int i=0; i < 0x400; i++)
+      {
+        digitalWrite(BUZZER, (i & 1));
+        delay(1);
+      }
+#else
       delay(500);
+#endif      
+      
       digitalWrite(LED, LOW);
       digitalWrite(BUZZER, LOW);
     }
@@ -259,26 +257,6 @@ int PlayTones()
 
 }
  
-
-int PlayMusic()  //This causes some form of stack corruption 
-{
- for (int thisNote = 0; thisNote < 8; thisNote++) 
- {
-   // to calculate the note duration, take one second divided by the note type.
-    //e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
-    int noteDuration = 1000 / noteDurations[thisNote];
-    tone(BUZZER, melody[thisNote], noteDuration);
-
-    // to distinguish the notes, set a minimum time between them.
-    // the note's duration + 30% seems to work well:
-    int pauseBetweenNotes = noteDuration * 1.30;
-    Serial.println(pauseBetweenNotes);
-    delay(pauseBetweenNotes);
-    // stop the tone playing:
-    noTone(BUZZER);
-  }
-}
-
 void drawUI()
 {
   unsigned long t = millis();
@@ -307,7 +285,7 @@ void drawFrame()
   display.drawLine(display.width() / 2, 0, display.width() / 2, display.height() -1, SSD1306_WHITE);   //Horizontal Line
 }
 
-void drawBattery(int x, int y, int mV) 
+void drawBattery(int x, int y, int mV)  //Medium unit croaked slighly below  2914mV  Small unit croaked at 3810mV.. Hmmm
 {
   display.drawRect(x, y, BATT_W, BATT_H, SSD1306_WHITE);
   display.drawRect(x + BATT_W, y + (BATT_H / 2) - 2 , 2, 4, SSD1306_WHITE);
@@ -327,7 +305,7 @@ void drawRSSI(int x, int y, int db)
   int xt, yt;
   int rfMargin;
   
-  rfMargin = 110 - abs(db);
+  rfMargin = 120 - abs(db);
 
   display.drawTriangle(
       x, y + 7,
@@ -336,15 +314,15 @@ void drawRSSI(int x, int y, int db)
 
     if (rfMargin < 0)  
       return;        
-    else if (rfMargin < 5) {
+    else if (rfMargin < 3) {
         xt = 4;
         yt = 2;
     }
-    else if (rfMargin < 10) { 
+    else if (rfMargin < 9) { 
         xt = 6;
         yt = 3;
     }
-    else if (rfMargin < 15) { 
+    else if (rfMargin < 10) { 
         xt = 8;
         yt = 4;
     }
